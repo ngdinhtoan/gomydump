@@ -38,6 +38,42 @@ func (table *TableExport) exportFileName() string {
 	return *exportDir + table.tableName + ".sql"
 }
 
+func (table *TableExport) mysqldump() {
+	args := []string{}
+	if *socket != "" {
+		args = append(args, fmt.Sprintf("--socket=%s", *socket))
+	} else {
+		args = append(args, fmt.Sprintf("--host=%s --port=%d", *host, *port))
+	}
+	if *username != "" {
+		args = append(args, fmt.Sprintf("-u%s", *username))
+	}
+	if *password != "" {
+		args = append(args, fmt.Sprintf("-p%s", *password))
+	}
+	args = append(args, table.dbName, table.tableName)
+
+	// open the out file for writing
+	outfile, err := os.Create(table.exportFileName())
+	handleError(err, "Could not create file")
+	defer outfile.Close()
+
+	cmd := exec.Command("mysqldump", args...)
+	cmd.Stdout = outfile
+
+	stderr, err := cmd.StderrPipe()
+
+	err = cmd.Start()
+	handleError(err, "Error when starts dumping table via mysqldump")
+
+	go io.Copy(os.Stderr, stderr)
+
+	err = cmd.Wait()
+
+	// export finish, close db connect to avoid 'too many connections' error
+	table.fileFinishChan <- table.exportFileName()
+}
+
 func (table *TableExport) process() {
 	if *verbose {
 		log.Printf("Processing table %s...", table.tableName)
@@ -52,40 +88,7 @@ func (table *TableExport) process() {
 	if *mysqldump {
 		// close db connection as don't use anymore to avoid too many connections error
 		table.db.Close()
-
-		args := []string{}
-		if *socket != "" {
-			args = append(args, fmt.Sprintf("--socket=%s", *socket))
-		} else {
-			args = append(args, fmt.Sprintf("--host=%s --port=%d", *host, *port))
-		}
-		if *username != "" {
-			args = append(args, fmt.Sprintf("-u%s", *username))
-		}
-		if *password != "" {
-			args = append(args, fmt.Sprintf("-p%s", *password))
-		}
-		args = append(args, table.dbName, table.tableName)
-
-		// open the out file for writing
-		outfile, err := os.Create(table.exportFileName())
-		handleError(err, "Could not create file")
-		defer outfile.Close()
-
-		cmd := exec.Command("mysqldump", args...)
-		cmd.Stdout = outfile
-
-		stderr, err := cmd.StderrPipe()
-
-		err = cmd.Start()
-		handleError(err, "Error when starts dumping table via mysqldump")
-
-		go io.Copy(os.Stderr, stderr)
-
-		err = cmd.Wait()
-
-		// export finish, close db connect to avoid 'too many connections' error
-		table.fileFinishChan <- table.exportFileName()
+		table.mysqldump()
 		return
 	}
 

@@ -111,8 +111,9 @@ func (dbReader *DatabaseReader) getTables() {
 			for i := 0; i < TablesChunk; i++ {
 				fileFinish := <-fileFinishChan
 				// copy file from each table to one file
-				log.Printf("Finish %s", fileFinish)
-				srcFile, _ := os.Open(fileFinish)
+				// log.Printf("Finish %s", fileFinish)
+				srcFile, err := os.Open(fileFinish)
+				handleError(err, "Could not open file")
 				io.Copy(file, srcFile)
 				srcFile.Close()
 				os.Remove(fileFinish)
@@ -126,8 +127,9 @@ func (dbReader *DatabaseReader) getTables() {
 		for i := 0; i < num; i++ {
 			fileFinish := <-fileFinishChan
 			// copy file from each table to one file
-			log.Printf("Finish %s", fileFinish)
-			srcFile, _ := os.Open(fileFinish)
+			// log.Printf("Finish %s", fileFinish)
+			srcFile, err := os.Open(fileFinish)
+			handleError(err, "Could not open file")
 			io.Copy(file, srcFile)
 			srcFile.Close()
 			os.Remove(fileFinish)
