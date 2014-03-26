@@ -1,0 +1,13 @@
+language: go
+
+go: 
+ - 1.2
+ - release
+ - tip
+
+install:
+ - go get github.com/go-sql-driver/mysql
+
+script:
+ - go fmt
+ - go build
